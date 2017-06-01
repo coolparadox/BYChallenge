@@ -2,20 +2,19 @@
 # Byne challenge server
 #
 
+import logging
+import random
 import zmq
 
+# Communication protocol commands, see protocol specification at
+# https://github.com/coolparadox/BYChallenge/wiki/Protocol-Specification
+CMD_HELLO = 0x00
+CMD_GET_EVEN = 0x01
+CMD_GET_ODD = 0x02
+CMD_ACCEPT_VALUE = 0x03
+
 # Version of communication protocol
-PROTOCOL_VERSION = "1"
-
-# Server acknowledge message
-ACK = "\x64"
-
-# Client message types
-MSG_VERSION = 0     # Request of protocol version
-MSG_CLIENT_ID = 1   # Provision of client identification
-MSG_GET_EVEN = 2    # Request of an even number
-MSG_GET_ODD = 3     # Request of an odd number
-MSG_VALUE = 4       # Provision of a value
+PROTOCOL_VERSION = 1
 
 def make_even_number():
     """Produce an even pseudo random number from 0 to 99."""
@@ -28,64 +27,80 @@ def make_odd_number():
 class Server:
     """Byne challenge server."""
 
+    def __init__(self, log_file):
+
+        logging.basicConfig(filename=log_file, level=logging.DEBUG)
+        logging.info('Byne challenge server instantiated.')
+
     def start(self, endpoint):
         """Binds to a 0MQ endpoint and start serving."""
-
-        # FIXME: LOG ALL MESSAGES!!
 
         # Bind to 0MQ socket
         ctx = zmq.Context.instance()
         socket = ctx.socket(zmq.REP)
         socket.bind(endpoint)
+        logging.info("binded to endpoint %s" % endpoint)
 
         # Serve
         while True:
 
-            # Wait for a client
+            # Wait for a request
             msg = socket.recv()
 
+            # FIXME: identify client
+            client_id = 0
+
             # Parse message
-            msg_type = MSG_VERSION
+            command = CMD_HELLO
             if len(msg) != 0:
-                msg_type = msg[0]
-            if msg_type == MSG_VERSION:
+                command = ord(msg[0])
+            else:
+                logging.warning("zero length message received from %s; assuming hello request" % client_id)
 
-                # A client is requesting for this protocol version
-                socket.send(protocol_version)
+            if command == CMD_HELLO:
 
-            elif msg_type == MSG_CLIENT_ID:
+                logging.debug("received hello request from %s" % client_id)
+                # FIXME: lookup client current value
+                client_value = 0
+                answer = ''.join([chr(commmand), chr(PROTOCOL_VERSION), chr(client_value)])
+                socket.send(answer)
+                logging.debug("sent hello reply to %s: protocol version %d, client value %d" % (client_id, PROTOCOL_VERSION, client_value))
 
-                # Client is identifying itself
-                client_id = msg[1:]
-                # FIXME: lookup client current value to return
-                socket.send("\x00")
+            elif command == CMD_GET_EVEN:
 
-            elif msg_type == MSG_GET_EVEN:
+                logging.debug("received get_even request from %s" % client_id)
+                value = make_even_number()
+                answer = ''.join([chr(command), chr(value)])
+                socket.send(answer)
+                logging.debug("sent get_even reply to %s: value %d" % (client_id, value))
 
-                # Client requests an even number
-                client_id = msg[1:]
-                # FIXME: update client current value in map
-                socket.send(make_even_number())
+            elif command == CMD_GET_ODD:
 
-            elif msg_type == MSG_GET_ODD:
+                logging.debug("received get_odd request from %s" % client_id)
+                value = make_odd_number()
+                answer = ''.join([chr(command), chr(value)])
+                socket.send(answer)
+                logging.debug("sent get_odd reply to %s: value %d" % (client_id, value))
 
-                # Client requests an odd number
-                client_id = msg[1:]
-                # FIXME: update client current value in map
-                socket.send(make_odd_number())
+            elif command == CMD_ACCEPT_VALUE:
 
-            elif msg_type == MSG_VALUE:
-
-                # Client sends a value
-                value = msg[1]
-                client_id = msg[1:]
-                socket.send(ACK)
+                value = 0
+                if len(msg) >= 2:
+                    value = ord(msg[1])
+                    logging.debug("received accept_value request from %s: value %d" % (client_id, value))
+                else:
+                    logging.warning("received accept_value request from %s without parameter; assuming %d" % (client_id, value))
+                answer = ''.join([chr(command)])
+                socket.send(answer)
+                logging.debug("sent accept_value reply to %s" % client_id)
 
             else:
 
-                # Unknown message type
-                socket.send(ACK)
+                logging.warning("unknown command %d received from %s; assuming hello request" % (command, client_id))
+                # FIXME: lookup client current value
+                answer = ''.join([chr(CMD_HELLO), chr(PROTOCOL_VERSION), chr(0)])
+                socket.send(answer)
 
 # Start server
-Server().start("tcp://*:5555")
+Server('/tmp/server.log').start("tcp://*:5555")
 
