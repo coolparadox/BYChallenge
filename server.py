@@ -9,11 +9,15 @@ import zmq
 
 def make_even_number():
     """Produce an even pseudo random number from 0 to 99."""
+
     return random.randrange(0, 100, 2)
+
 
 def make_odd_number():
     """Produce an odd pseudo random number from 0 to 99."""
+
     return random.randrange(1, 100, 2)
+
 
 class Server:
     """Byne challenge server."""
@@ -91,6 +95,7 @@ class Server:
                 # FIXME: lookup client current value
                 answer = ''.join([chr(protocol.CMD_HELLO), chr(protocol.VERSION), chr(0)])
                 socket.send(answer)
+
 
 # Start server
 Server('/tmp/server.log').start("tcp://*:5555")

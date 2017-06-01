@@ -3,6 +3,7 @@
 #
 
 import protocol
+import random
 import Queue
 import threading
 #import time
@@ -24,6 +25,7 @@ TODO_GET_NEW_INCREMENT = 1
 # Time period for incrementing value
 INCREMENT_PERIOD = 0.5
 
+
 def work():
     """Increment working_value by increment_amount."""
 
@@ -34,7 +36,7 @@ def work():
     # Restart timer
     threading.Timer(INCREMENT_PERIOD, work).start()
 
-    # Calculate new working value,
+    # Calculate new working value.
     # Apply automatic turn in order to keep it between 0 and 99.
     new_value = working_value + increment_amount
     if new_value > 99:
@@ -47,14 +49,26 @@ def work():
     todo.put(TODO_SEND_VALUE)
 
 
+def queue_get_increment():
+    """Notify for getting a new increment value from server."""
+
+    global todo
+
+    # Restart timer
+    threading.Timer(random.uniform(3.0, 5.0), queue_get_increment).start()
+
+    # Notify
+    todo.put(TODO_GET_NEW_INCREMENT)
+
+
 class Client:
     """Byne challenge client."""
 
     # Does this client request odd numbers from server?
-    mOdd = True
+    odd = True
 
     def __init__(self, odd = True):
-        mOdd = odd
+        self.odd = odd
 
     def start(self, endpoint):
         """Connect to a Byne challenge server at a 0MQ endpoint"""
@@ -79,7 +93,7 @@ class Client:
         proto_ver = ord(reply[1])
         assert proto_ver == protocol.VERSION, "cannot handle protocol version %d" % proto_ver
 
-        # Update work value
+        # Update working value with server reply
         working_value = ord(reply[2])
         assert 0 <= working_value <= 99, "out of range value from server: %d" % working_value
 
@@ -87,7 +101,7 @@ class Client:
         threading.Timer(INCREMENT_PERIOD, work).start()
 
         # Start increment update timer
-        # ...
+        threading.Timer(random.uniform(3.0, 5.0), queue_get_increment).start()
 
         # Loop forever
         while True:
@@ -108,7 +122,7 @@ class Client:
 
                 # It's time to get a new increment value from server
                 command = protocol.CMD_GET_EVEN
-                if mOdd:
+                if self.odd:
                     command = protocol.CMD_GET_ODD
                 request = ''.join([chr(command)])
                 socket.send(request)
@@ -116,6 +130,7 @@ class Client:
                 assert len(reply) >= 2, "unexpected get value reply length (%d)" % len(reply)
                 assert ord(reply[0]) == command, "unexpected server reply command: expected %d, got %d" % (command, ord(reply[0]))
                 increment_amount = ord(reply[1])
+
 
 # Start client
 Client().start("tcp://localhost:5555")
