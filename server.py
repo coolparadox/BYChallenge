@@ -3,18 +3,9 @@
 #
 
 import logging
+import protocol
 import random
 import zmq
-
-# Communication protocol commands, see protocol specification at
-# https://github.com/coolparadox/BYChallenge/wiki/Protocol-Specification
-CMD_HELLO = 0x00
-CMD_GET_EVEN = 0x01
-CMD_GET_ODD = 0x02
-CMD_ACCEPT_VALUE = 0x03
-
-# Version of communication protocol
-PROTOCOL_VERSION = 1
 
 def make_even_number():
     """Produce an even pseudo random number from 0 to 99."""
@@ -51,22 +42,22 @@ class Server:
             client_id = 0
 
             # Parse message
-            command = CMD_HELLO
+            command = protocol.CMD_HELLO
             if len(msg) != 0:
                 command = ord(msg[0])
             else:
                 logging.warning("zero length message received from %s; assuming hello request" % client_id)
 
-            if command == CMD_HELLO:
+            if command == protocol.CMD_HELLO:
 
                 logging.debug("received hello request from %s" % client_id)
                 # FIXME: lookup client current value
                 client_value = 0
-                answer = ''.join([chr(commmand), chr(PROTOCOL_VERSION), chr(client_value)])
+                answer = ''.join([chr(command), chr(protocol.VERSION), chr(client_value)])
                 socket.send(answer)
-                logging.debug("sent hello reply to %s: protocol version %d, client value %d" % (client_id, PROTOCOL_VERSION, client_value))
+                logging.debug("sent hello reply to %s: protocol version %d, client value %d" % (client_id, protocol.VERSION, client_value))
 
-            elif command == CMD_GET_EVEN:
+            elif command == protocol.CMD_GET_EVEN:
 
                 logging.debug("received get_even request from %s" % client_id)
                 value = make_even_number()
@@ -74,7 +65,7 @@ class Server:
                 socket.send(answer)
                 logging.debug("sent get_even reply to %s: value %d" % (client_id, value))
 
-            elif command == CMD_GET_ODD:
+            elif command == protocol.CMD_GET_ODD:
 
                 logging.debug("received get_odd request from %s" % client_id)
                 value = make_odd_number()
@@ -82,7 +73,7 @@ class Server:
                 socket.send(answer)
                 logging.debug("sent get_odd reply to %s: value %d" % (client_id, value))
 
-            elif command == CMD_ACCEPT_VALUE:
+            elif command == protocol.CMD_ACCEPT_VALUE:
 
                 value = 0
                 if len(msg) >= 2:
@@ -98,7 +89,7 @@ class Server:
 
                 logging.warning("unknown command %d received from %s; assuming hello request" % (command, client_id))
                 # FIXME: lookup client current value
-                answer = ''.join([chr(CMD_HELLO), chr(PROTOCOL_VERSION), chr(0)])
+                answer = ''.join([chr(protocol.CMD_HELLO), chr(protocol.VERSION), chr(0)])
                 socket.send(answer)
 
 # Start server
