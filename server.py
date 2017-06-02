@@ -67,54 +67,54 @@ class Server:
             if len(req) != 0:
                 command = ord(req[0])
             else:
-                logging.warning("zero length message received from %s; assuming hello request" % cid)
+                logging.warning("zero length message received from client %s; assuming hello request" % cid)
 
             if command == protocol.CMD_HELLO:
 
-                logging.debug("received hello request from %s" % cid)
+                logging.debug("received hello request from client %s" % cid)
                 value = values.get(cid, 0)
                 answer = ''.join([chr(command), chr(protocol.VERSION), chr(value)])
                 socket.send_multipart([cid, efd, answer])
-                logging.debug("sent hello reply to %s: protocol version %d, client value %d" % (cid, protocol.VERSION, value))
+                logging.debug("sent hello reply to client %s: protocol version %d, client value %d" % (cid, protocol.VERSION, value))
 
             elif command == protocol.CMD_GET_EVEN:
 
-                logging.debug("received get_even request from %s" % cid)
+                logging.debug("received get_even request from client %s" % cid)
                 value = self.make_even_number()
                 answer = ''.join([chr(command), chr(value)])
                 socket.send_multipart([cid, efd, answer])
                 values[cid] = value
-                logging.debug("sent get_even reply to %s: value %d" % (cid, value))
+                logging.debug("sent get_even reply to client %s: value %d" % (cid, value))
 
             elif command == protocol.CMD_GET_ODD:
 
-                logging.debug("received get_odd request from %s" % cid)
+                logging.debug("received get_odd request from client %s" % cid)
                 value = self.make_odd_number()
                 answer = ''.join([chr(command), chr(value)])
                 socket.send_multipart([cid, efd, answer])
                 values[cid] = value
-                logging.debug("sent get_odd reply to %s: value %d" % (cid, value))
+                logging.debug("sent get_odd reply to client %s: value %d" % (cid, value))
 
             elif command == protocol.CMD_ACCEPT_VALUE:
 
                 value = 0
                 if len(req) >= 2:
                     value = ord(req[1])
-                    logging.debug("received accept_value request from %s: value %d" % (cid, value))
+                    logging.debug("received accept_value request from client %s: value %d" % (cid, value))
                 else:
-                    logging.warning("received accept_value request from %s without parameter; assuming %d" % (cid, value))
+                    logging.warning("received accept_value request from client %s without parameter; assuming %d" % (cid, value))
                 answer = ''.join([chr(command)])
                 socket.send_multipart([cid, efd, answer])
-                logging.debug("sent accept_value reply to %s" % cid)
+                logging.debug("sent accept_value reply to client %s" % cid)
 
             else:
 
-                logging.warning("unknown command %d received from %s; assuming hello request" % (command, cid))
+                logging.warning("unknown command %d received from client %s; assuming hello request" % (command, cid))
                 command = protocol.CMD_HELLO
                 value = values.get(cid, 0)
                 answer = ''.join([chr(command), chr(protocol.VERSION), chr(value)])
                 socket.send_multipart([cid, efd, answer])
-                logging.debug("sent hello reply to %s: protocol version %d, client value %d" % (cid, protocol.VERSION, value))
+                logging.debug("sent hello reply to client %s: protocol version %d, client value %d" % (cid, protocol.VERSION, value))
 
 
 if __name__ == '__main__':
