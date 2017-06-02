@@ -6,6 +6,7 @@ import argparse
 import logging
 import protocol
 import random
+import sys
 import zmq
 
 def make_even_number():
@@ -33,69 +34,81 @@ class Server:
 
         # Bind to 0MQ socket
         ctx = zmq.Context.instance()
-        socket = ctx.socket(zmq.REP)
+        socket = ctx.socket(zmq.ROUTER)
         socket.bind(endpoint)
         logging.info("binded to endpoint %s" % endpoint)
 
         # Serve
         while True:
 
-            # Wait for a request
-            msg = socket.recv()
-
-            # FIXME: identify client
-            client_id = 0
+            # Wait for clients
+            frames = socket.recv_multipart()
+            if len(frames) != 3:
+                logging.warning("received message with %d frames, ignoring" % len(frames))
+                continue
+            cid = frames[0] # client id
+            efd = frames[1] # empty frame delimiter
+            req = frames[2] # client message
+            if len(cid) < 1:
+                logging.warning("empty client identifier; ignoring")
+                continue
+            if len(efd) != 0:
+                logging.warning("not empty frame delimiter; ignoring")
+                continue
+            if len(req) < 1:
+                logging.warning("empty client request; ignoring")
+                continue
 
             # Parse message
             command = protocol.CMD_HELLO
-            if len(msg) != 0:
-                command = ord(msg[0])
+            if len(req) != 0:
+                command = ord(req[0])
             else:
-                logging.warning("zero length message received from %s; assuming hello request" % client_id)
+                logging.warning("zero length message received from %s; assuming hello request" % cid)
 
             if command == protocol.CMD_HELLO:
 
-                logging.debug("received hello request from %s" % client_id)
+                logging.debug("received hello request from %s" % cid)
                 # FIXME: lookup client current value
                 client_value = 0
                 answer = ''.join([chr(command), chr(protocol.VERSION), chr(client_value)])
-                socket.send(answer)
-                logging.debug("sent hello reply to %s: protocol version %d, client value %d" % (client_id, protocol.VERSION, client_value))
+                socket.send_multipart([cid, efd, answer])
+                logging.debug("sent hello reply to %s: protocol version %d, client value %d" % (cid, protocol.VERSION, client_value))
 
             elif command == protocol.CMD_GET_EVEN:
 
-                logging.debug("received get_even request from %s" % client_id)
+                logging.debug("received get_even request from %s" % cid)
                 value = make_even_number()
                 answer = ''.join([chr(command), chr(value)])
-                socket.send(answer)
-                logging.debug("sent get_even reply to %s: value %d" % (client_id, value))
+                socket.send_multipart([cid, efd, answer])
+                logging.debug("sent get_even reply to %s: value %d" % (cid, value))
 
             elif command == protocol.CMD_GET_ODD:
 
-                logging.debug("received get_odd request from %s" % client_id)
+                logging.debug("received get_odd request from %s" % cid)
                 value = make_odd_number()
                 answer = ''.join([chr(command), chr(value)])
-                socket.send(answer)
-                logging.debug("sent get_odd reply to %s: value %d" % (client_id, value))
+                socket.send_multipart([cid, efd, answer])
+                logging.debug("sent get_odd reply to %s: value %d" % (cid, value))
 
             elif command == protocol.CMD_ACCEPT_VALUE:
 
                 value = 0
-                if len(msg) >= 2:
-                    value = ord(msg[1])
-                    logging.debug("received accept_value request from %s: value %d" % (client_id, value))
+                if len(req) >= 2:
+                    value = ord(req[1])
+                    logging.debug("received accept_value request from %s: value %d" % (cid, value))
                 else:
-                    logging.warning("received accept_value request from %s without parameter; assuming %d" % (client_id, value))
+                    logging.warning("received accept_value request from %s without parameter; assuming %d" % (cid, value))
                 answer = ''.join([chr(command)])
-                socket.send(answer)
-                logging.debug("sent accept_value reply to %s" % client_id)
+                socket.send_multipart([cid, efd, answer])
+                logging.debug("sent accept_value reply to %s" % cid)
 
             else:
 
-                logging.warning("unknown command %d received from %s; assuming hello request" % (command, client_id))
+                logging.warning("unknown command %d received from %s; assuming hello request" % (command, cid))
                 # FIXME: lookup client current value
                 answer = ''.join([chr(protocol.CMD_HELLO), chr(protocol.VERSION), chr(0)])
-                socket.send(answer)
+                socket.send_multipart([cid, efd, answer])
 
 
 if __name__ == '__main__':

@@ -66,10 +66,14 @@ def queue_get_increment():
 class Client:
     """Byne challenge client."""
 
+    # Identity of this client
+    cid = "client"
+
     # Does this client request odd numbers from server?
     odd = True
 
-    def __init__(self, odd = True):
+    def __init__(self, odd = True, cid = "client"):
+        self.cid = cid
         self.odd = odd
 
     def start(self, endpoint):
@@ -82,6 +86,7 @@ class Client:
         # Connect to server
         ctx = zmq.Context()
         socket = ctx.socket(zmq.REQ)
+        socket.setsockopt(zmq.IDENTITY, self.cid)
         socket.connect(endpoint)
 
         # Salute server
@@ -139,13 +144,15 @@ if __name__ == '__main__':
     # Parse command line arguments
     parser = argparse.ArgumentParser(
         description='Byne challenge client')
+    parser.add_argument('client_id', nargs=1, help='client identity')
     parser.add_argument('client_type', nargs=1, help='client type', choices=['odd', 'even'])
     parser.add_argument('server_url', nargs=1, help='0MQ endpoint to connect')
     args = parser.parse_args()
+    client_id = args.client_id[0]
     client_type = args.client_type[0]
     server_url = args.server_url[0]
 
     # Start client
-    sys.stderr.write('starting %s-type client, connecting to %s\n' % (client_type, server_url))
-    Client(odd=(client_type=='odd')).start(server_url)
+    sys.stderr.write('starting client "%s" of %s type, connecting to %s\n' % (client_id, client_type, server_url))
+    Client(cid=client_id, odd=(client_type=='odd')).start(server_url)
 
