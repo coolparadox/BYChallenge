@@ -40,6 +40,9 @@ class Client:
     # Timers should be restarted?
     restart_timers = True;
 
+    # Are we accessing the backup server?
+    backup_mode = False
+
     def __init__(self, odd = True, cid = "client"):
         self.cid = cid
         self.odd = odd
@@ -74,24 +77,43 @@ class Client:
         # Notify
         self.todo.put(TODO_GET_NEW_INCREMENT)
 
-    def send_and_recv(self, socket, request):
+    def send_and_recv(self, request):
         """Wrapper around send() and recv()."""
 
-        socket.send(request)
-        return socket.recv()
+        self.socket.send(request)
+        if self.backup_mode:
 
-    def start(self, endpoint):
+            # Client is in backup mode; just hope for the best.
+            return self.socket.recv()
+
+        elif self.socket.poll(3000) > 0:
+
+            # We have something from the primary server. Yay!
+            return self.socket.recv()
+
+        else:
+
+            # Primary server access timeout; switch to backup server.
+            self.socket = zmq.Context.instance().socket(zmq.REQ)
+            self.socket.setsockopt(zmq.IDENTITY, self.cid)
+            self.socket.connect(self.backup_endpoint)
+            return self.send_and_recv(request)
+
+
+    def start(self, primary_endpoint, backup_endpoint):
         """Connect to a Byne challenge server at a 0MQ endpoint"""
 
+        # Remember backup endpoint just in case of need
+        self.backup_endpoint = backup_endpoint
+
         # Connect to server
-        ctx = zmq.Context()
-        socket = ctx.socket(zmq.REQ)
-        socket.setsockopt(zmq.IDENTITY, self.cid)
-        socket.connect(endpoint)
+        self.socket = zmq.Context.instance().socket(zmq.REQ)
+        self.socket.setsockopt(zmq.IDENTITY, self.cid)
+        self.socket.connect(primary_endpoint)
 
         # Salute server
         request = chr(protocol.CMD_HELLO)
-        reply = self.send_and_recv(socket, request)
+        reply = self.send_and_recv(request)
         assert len(reply) >= 3, "unexpected hello reply length (%d)" % len(reply)
         assert ord(reply[0]) == protocol.CMD_HELLO, "unexpected server reply command: expected %d, got %d" % (protocol.CMD_HELLO, ord(reply[0]))
 
@@ -121,7 +143,7 @@ class Client:
                     # Work value has been updated
                     # Send it to server
                     request = "".join([chr(protocol.CMD_ACCEPT_VALUE), chr(self.working_value)])
-                    reply = self.send_and_recv(socket, request)
+                    reply = self.send_and_recv(request)
                     assert len(reply) >= 1, "unexpected accept value reply length (%d)" % len(reply)
                     assert ord(reply[0]) == protocol.CMD_ACCEPT_VALUE, "unexpected server reply command: expected %d, got %d" % (protocol.CMD_ACCEPT_VALUE, ord(reply[0]))
 
@@ -132,7 +154,7 @@ class Client:
                     if self.odd:
                         command = protocol.CMD_GET_ODD
                     request = ''.join([chr(command)])
-                    reply = self.send_and_recv(socket, request)
+                    reply = self.send_and_recv(request)
                     assert len(reply) >= 2, "unexpected get value reply length (%d)" % len(reply)
                     assert ord(reply[0]) == command, "unexpected server reply command: expected %d, got %d" % (command, ord(reply[0]))
                     self.increment_amount = ord(reply[1])
@@ -151,13 +173,15 @@ if __name__ == '__main__':
         description='Byne challenge client')
     parser.add_argument('client_id', nargs=1, help='client identity')
     parser.add_argument('client_type', nargs=1, help='client type', choices=['odd', 'even'])
-    parser.add_argument('server_url', nargs=1, help='0MQ endpoint to connect')
+    parser.add_argument('primary_url', nargs=1, help='0MQ endpoint of primary server')
+    parser.add_argument('backup_url', nargs=1, help='0MQ endpoint of backup server')
     args = parser.parse_args()
     client_id = args.client_id[0]
     client_type = args.client_type[0]
-    server_url = args.server_url[0]
+    primary_url = args.primary_url[0]
+    backup_url = args.backup_url[0]
 
     # Start client
-    sys.stderr.write('starting client "%s" of %s type, connecting to %s\n' % (client_id, client_type, server_url))
-    Client(cid=client_id, odd=(client_type=='odd')).start(server_url)
+    sys.stderr.write('starting client "%s" of %s type, connecting to %s with backup %s\n' % (client_id, client_type, primary_url, backup_url))
+    Client(cid=client_id, odd=(client_type=='odd')).start(primary_url, backup_url)
 
