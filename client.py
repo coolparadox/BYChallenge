@@ -11,56 +11,12 @@ import sys
 import threading
 import zmq
 
-# Current value to be worked on
-working_value = 0
-
-# Increment amount of working_value
-increment_amount = 1
-
-# Access control to socket
-todo = Queue.Queue()
-
 # Constants for access control to socket
 TODO_SEND_VALUE = 0
 TODO_GET_NEW_INCREMENT = 1
 
 # Time period for incrementing value
 INCREMENT_PERIOD = 0.5
-
-
-def work():
-    """Increment working_value by increment_amount."""
-
-    global working_value
-    global increment_amount
-    global todo
-
-    # Restart timer
-    threading.Timer(INCREMENT_PERIOD, work).start()
-
-    # Calculate new working value.
-    # Apply automatic turn in order to keep it between 0 and 99.
-    new_value = working_value + increment_amount
-    if new_value > 99:
-        new_value = new_value - 100
-
-    # Update work value
-    working_value = new_value
-
-    # Notify for sending to server
-    todo.put(TODO_SEND_VALUE)
-
-
-def queue_get_increment():
-    """Notify for getting a new increment value from server."""
-
-    global todo
-
-    # Restart timer
-    threading.Timer(random.uniform(3.0, 5.0), queue_get_increment).start()
-
-    # Notify
-    todo.put(TODO_GET_NEW_INCREMENT)
 
 
 class Client:
@@ -72,16 +28,49 @@ class Client:
     # Does this client request odd numbers from server?
     odd = True
 
+    # Current value to be worked on
+    working_value = 0
+
+    # Increment amount of working_value
+    increment_amount = 1
+
+    # Access control to socket
+    todo = Queue.Queue()
+
     def __init__(self, odd = True, cid = "client"):
         self.cid = cid
         self.odd = odd
 
+    def work(self):
+        """Increment working_value by increment_amount."""
+
+        # Restart timer
+        threading.Timer(INCREMENT_PERIOD, self.work).start()
+
+        # Calculate new working value.
+        # Apply automatic turn in order to keep it between 0 and 99.
+        new_value = self.working_value + self.increment_amount
+        if new_value > 99:
+            new_value = new_value - 100
+
+        # Update work value
+        self.working_value = new_value
+
+        # Notify for sending to server
+        self.todo.put(TODO_SEND_VALUE)
+
+
+    def queue_get_increment(self):
+        """Notify for getting a new increment value from server."""
+
+        # Restart timer
+        threading.Timer(random.uniform(3.0, 5.0), self.queue_get_increment).start()
+
+        # Notify
+        self.todo.put(TODO_GET_NEW_INCREMENT)
+
     def start(self, endpoint):
         """Connect to a Byne challenge server at a 0MQ endpoint"""
-
-        global working_value
-        global increment_amount
-        global todo
 
         # Connect to server
         ctx = zmq.Context()
@@ -101,25 +90,25 @@ class Client:
         assert proto_ver == protocol.VERSION, "cannot handle protocol version %d" % proto_ver
 
         # Update working value with server reply
-        working_value = ord(reply[2])
-        assert 0 <= working_value <= 99, "out of range value from server: %d" % working_value
+        self.working_value = ord(reply[2])
+        assert 0 <= self.working_value <= 99, "out of range value from server: %d" % self.working_value
 
         # Start timer for incrementing value
-        threading.Timer(INCREMENT_PERIOD, work).start()
+        threading.Timer(INCREMENT_PERIOD, self.work).start()
 
         # Start increment update timer
-        threading.Timer(random.uniform(3.0, 5.0), queue_get_increment).start()
+        threading.Timer(random.uniform(3.0, 5.0), self.queue_get_increment).start()
 
         # Loop forever
         while True:
 
             # Wait until there is something to do
-            next_action = todo.get()
+            next_action = self.todo.get()
             if next_action == TODO_SEND_VALUE:
 
                 # Work value has been updated
                 # Send it to server
-                request = "".join([chr(protocol.CMD_ACCEPT_VALUE), chr(working_value)])
+                request = "".join([chr(protocol.CMD_ACCEPT_VALUE), chr(self.working_value)])
                 socket.send(request)
                 reply = socket.recv()
                 assert len(reply) >= 1, "unexpected accept value reply length (%d)" % len(reply)
@@ -136,7 +125,7 @@ class Client:
                 reply = socket.recv()
                 assert len(reply) >= 2, "unexpected get value reply length (%d)" % len(reply)
                 assert ord(reply[0]) == command, "unexpected server reply command: expected %d, got %d" % (command, ord(reply[0]))
-                increment_amount = ord(reply[1])
+                self.increment_amount = ord(reply[1])
 
 
 if __name__ == '__main__':
