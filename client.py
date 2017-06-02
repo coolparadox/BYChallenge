@@ -37,6 +37,9 @@ class Client:
     # Access control to socket
     todo = Queue.Queue()
 
+    # Timers should be restarted?
+    restart_timers = True;
+
     def __init__(self, odd = True, cid = "client"):
         self.cid = cid
         self.odd = odd
@@ -45,7 +48,8 @@ class Client:
         """Increment working_value by increment_amount."""
 
         # Restart timer
-        threading.Timer(INCREMENT_PERIOD, self.work).start()
+        if self.restart_timers:
+            threading.Timer(INCREMENT_PERIOD, self.work).start()
 
         # Calculate new working value.
         # Apply automatic turn in order to keep it between 0 and 99.
@@ -64,10 +68,17 @@ class Client:
         """Notify for getting a new increment value from server."""
 
         # Restart timer
-        threading.Timer(random.uniform(3.0, 5.0), self.queue_get_increment).start()
+        if self.restart_timers:
+            threading.Timer(random.uniform(3.0, 5.0), self.queue_get_increment).start()
 
         # Notify
         self.todo.put(TODO_GET_NEW_INCREMENT)
+
+    def send_and_recv(self, socket, request):
+        """Wrapper around send() and recv()."""
+
+        socket.send(request)
+        return socket.recv()
 
     def start(self, endpoint):
         """Connect to a Byne challenge server at a 0MQ endpoint"""
@@ -80,8 +91,7 @@ class Client:
 
         # Salute server
         request = chr(protocol.CMD_HELLO)
-        socket.send(request)
-        reply = socket.recv()
+        reply = self.send_and_recv(socket, request)
         assert len(reply) >= 3, "unexpected hello reply length (%d)" % len(reply)
         assert ord(reply[0]) == protocol.CMD_HELLO, "unexpected server reply command: expected %d, got %d" % (protocol.CMD_HELLO, ord(reply[0]))
 
@@ -102,30 +112,36 @@ class Client:
         # Loop forever
         while True:
 
-            # Wait until there is something to do
-            next_action = self.todo.get()
-            if next_action == TODO_SEND_VALUE:
+            try:
 
-                # Work value has been updated
-                # Send it to server
-                request = "".join([chr(protocol.CMD_ACCEPT_VALUE), chr(self.working_value)])
-                socket.send(request)
-                reply = socket.recv()
-                assert len(reply) >= 1, "unexpected accept value reply length (%d)" % len(reply)
-                assert ord(reply[0]) == protocol.CMD_ACCEPT_VALUE, "unexpected server reply command: expected %d, got %d" % (protocol.CMD_ACCEPT_VALUE, ord(reply[0]))
+                # Wait until there is something to do
+                next_action = self.todo.get()
+                if next_action == TODO_SEND_VALUE:
 
-            else:
+                    # Work value has been updated
+                    # Send it to server
+                    request = "".join([chr(protocol.CMD_ACCEPT_VALUE), chr(self.working_value)])
+                    reply = self.send_and_recv(socket, request)
+                    assert len(reply) >= 1, "unexpected accept value reply length (%d)" % len(reply)
+                    assert ord(reply[0]) == protocol.CMD_ACCEPT_VALUE, "unexpected server reply command: expected %d, got %d" % (protocol.CMD_ACCEPT_VALUE, ord(reply[0]))
 
-                # It's time to get a new increment value from server
-                command = protocol.CMD_GET_EVEN
-                if self.odd:
-                    command = protocol.CMD_GET_ODD
-                request = ''.join([chr(command)])
-                socket.send(request)
-                reply = socket.recv()
-                assert len(reply) >= 2, "unexpected get value reply length (%d)" % len(reply)
-                assert ord(reply[0]) == command, "unexpected server reply command: expected %d, got %d" % (command, ord(reply[0]))
-                self.increment_amount = ord(reply[1])
+                else:
+
+                    # It's time to get a new increment value from server
+                    command = protocol.CMD_GET_EVEN
+                    if self.odd:
+                        command = protocol.CMD_GET_ODD
+                    request = ''.join([chr(command)])
+                    reply = self.send_and_recv(socket, request)
+                    assert len(reply) >= 2, "unexpected get value reply length (%d)" % len(reply)
+                    assert ord(reply[0]) == command, "unexpected server reply command: expected %d, got %d" % (command, ord(reply[0]))
+                    self.increment_amount = ord(reply[1])
+
+            except KeyboardInterrupt, SystemExit:
+
+                # Stop timers
+                self.restart_timers = False
+                raise
 
 
 if __name__ == '__main__':
