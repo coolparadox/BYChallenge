@@ -9,17 +9,6 @@ import random
 import sys
 import zmq
 
-def make_even_number():
-    """Produce an even pseudo random number from 0 to 99."""
-
-    return random.randrange(0, 100, 2)
-
-
-def make_odd_number():
-    """Produce an odd pseudo random number from 0 to 99."""
-
-    return random.randrange(1, 100, 2)
-
 
 class Server:
     """Byne challenge server."""
@@ -28,6 +17,16 @@ class Server:
 
         logging.basicConfig(filename=log_file, level=logging.DEBUG)
         logging.info('Byne challenge server instantiated.')
+
+    def make_even_number(self):
+        """Produce an even pseudo random number from 0 to 99."""
+
+        return random.randrange(0, 100, 2)
+
+    def make_odd_number(self):
+        """Produce an odd pseudo random number from 0 to 99."""
+
+        return random.randrange(1, 100, 2)
 
     def start(self, endpoint):
         """Binds to a 0MQ endpoint and start serving."""
@@ -81,7 +80,7 @@ class Server:
             elif command == protocol.CMD_GET_EVEN:
 
                 logging.debug("received get_even request from %s" % cid)
-                value = make_even_number()
+                value = self.make_even_number()
                 answer = ''.join([chr(command), chr(value)])
                 socket.send_multipart([cid, efd, answer])
                 values[cid] = value
@@ -90,7 +89,7 @@ class Server:
             elif command == protocol.CMD_GET_ODD:
 
                 logging.debug("received get_odd request from %s" % cid)
-                value = make_odd_number()
+                value = self.make_odd_number()
                 answer = ''.join([chr(command), chr(value)])
                 socket.send_multipart([cid, efd, answer])
                 values[cid] = value
