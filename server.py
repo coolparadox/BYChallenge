@@ -32,6 +32,10 @@ class Server:
     def start(self, endpoint):
         """Binds to a 0MQ endpoint and start serving."""
 
+        # Latest values sent to clients.
+        # (key is the client id)
+        values = dict()
+
         # Bind to 0MQ socket
         ctx = zmq.Context.instance()
         socket = ctx.socket(zmq.ROUTER)
@@ -59,7 +63,7 @@ class Server:
                 logging.warning("empty client request; ignoring")
                 continue
 
-            # Parse message
+            # Parse client request
             command = protocol.CMD_HELLO
             if len(req) != 0:
                 command = ord(req[0])
@@ -69,11 +73,10 @@ class Server:
             if command == protocol.CMD_HELLO:
 
                 logging.debug("received hello request from %s" % cid)
-                # FIXME: lookup client current value
-                client_value = 0
-                answer = ''.join([chr(command), chr(protocol.VERSION), chr(client_value)])
+                value = values.get(cid, 0)
+                answer = ''.join([chr(command), chr(protocol.VERSION), chr(value)])
                 socket.send_multipart([cid, efd, answer])
-                logging.debug("sent hello reply to %s: protocol version %d, client value %d" % (cid, protocol.VERSION, client_value))
+                logging.debug("sent hello reply to %s: protocol version %d, client value %d" % (cid, protocol.VERSION, value))
 
             elif command == protocol.CMD_GET_EVEN:
 
@@ -81,6 +84,7 @@ class Server:
                 value = make_even_number()
                 answer = ''.join([chr(command), chr(value)])
                 socket.send_multipart([cid, efd, answer])
+                values[cid] = value
                 logging.debug("sent get_even reply to %s: value %d" % (cid, value))
 
             elif command == protocol.CMD_GET_ODD:
@@ -89,6 +93,7 @@ class Server:
                 value = make_odd_number()
                 answer = ''.join([chr(command), chr(value)])
                 socket.send_multipart([cid, efd, answer])
+                values[cid] = value
                 logging.debug("sent get_odd reply to %s: value %d" % (cid, value))
 
             elif command == protocol.CMD_ACCEPT_VALUE:
