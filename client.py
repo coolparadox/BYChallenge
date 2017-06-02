@@ -2,11 +2,13 @@
 # Byne challenge client
 #
 
+import argparse
+import logging
 import protocol
 import random
 import Queue
+import sys
 import threading
-#import time
 import zmq
 
 # Current value to be worked on
@@ -132,6 +134,18 @@ class Client:
                 increment_amount = ord(reply[1])
 
 
-# Start client
-Client().start("tcp://localhost:5555")
+if __name__ == '__main__':
+
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description='Byne challenge client')
+    parser.add_argument('client_type', nargs=1, help='client type', choices=['odd', 'even'])
+    parser.add_argument('server_url', nargs=1, help='0MQ endpoint to connect')
+    args = parser.parse_args()
+    client_type = args.client_type[0]
+    server_url = args.server_url[0]
+
+    # Start client
+    sys.stderr.write('starting %s-type client, connecting to %s\n' % (client_type, server_url))
+    Client(odd=(client_type=='odd')).start(server_url)
 

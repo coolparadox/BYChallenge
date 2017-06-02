@@ -2,6 +2,7 @@
 # Byne challenge server
 #
 
+import argparse
 import logging
 import protocol
 import random
@@ -97,6 +98,17 @@ class Server:
                 socket.send(answer)
 
 
-# Start server
-Server('/tmp/server.log').start("tcp://*:5555")
+if __name__ == '__main__':
+
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description='Byne challenge server')
+    parser.add_argument('log_file', nargs=1, help='path to log file')
+    parser.add_argument('endpoint', nargs=1, help='0MQ endpoint to bind')
+    args = parser.parse_args()
+    log_file = args.log_file[0]
+    endpoint = args.endpoint[0]
+
+    # Start server
+    Server(log_file=log_file).start(endpoint)
 
