@@ -111,9 +111,11 @@ class Server:
             else:
 
                 logging.warning("unknown command %d received from %s; assuming hello request" % (command, cid))
-                # FIXME: lookup client current value
-                answer = ''.join([chr(protocol.CMD_HELLO), chr(protocol.VERSION), chr(0)])
+                command = protocol.CMD_HELLO
+                value = values.get(cid, 0)
+                answer = ''.join([chr(command), chr(protocol.VERSION), chr(value)])
                 socket.send_multipart([cid, efd, answer])
+                logging.debug("sent hello reply to %s: protocol version %d, client value %d" % (cid, protocol.VERSION, value))
 
 
 if __name__ == '__main__':
