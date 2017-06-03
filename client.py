@@ -1,6 +1,54 @@
-#
-# Byne challenge client
-#
+"""
+Byne challenge client module
+
+This module implements the Byne challenge client.
+
+Example:
+
+    $ python2 client.py CLIENT-1 odd tcp://localhost:5555 tcp://localhost:5556 60
+
+Online help:
+
+    $ python2 client.py --help
+    usage: client.py [-h] client_id {odd,even} primary_url backup_url timeout
+
+    Byne challenge client
+
+    positional arguments:
+      client_id    client identity
+      {odd,even}   client type
+      primary_url  0MQ endpoint of primary server
+      backup_url   0MQ endpoint of backup server
+      timeout      primary server access timeout in seconds (0 = infinite)
+
+    optional arguments:
+      -h, --help   show this help message and exit
+
+Client identity is used to identify client when multiple clients are connected
+to the server and is assumed to be unique among the set of connected clients.
+
+Client type defines if client will request always an odd or an even value from
+the server; see Byne challenge server protocol specification.
+
+Primary url is the 0MQ endpoint of the primary server. Client connects to this
+server when starts.
+
+Backup url is the 0MQ endpoint of the backup server. Clinet connects to this
+server when the communication with the primary server times out.
+
+Timeout is the threshold delay in the communication with the primary server to
+declare that the primary server is out of reach. After this time of absence of
+communication with the primary server, client switches to the backup server.
+
+When a switch to the backup server happens, it is definitive. A manual restart
+is required in order the client goes back to use the primary server.
+
+Source code: https://github.com/coolparadox/BYChallenge
+
+Communication protocol specification:
+https://github.com/coolparadox/BYChallenge/wiki/Protocol-Specification
+
+"""
 
 import argparse
 import logging
@@ -21,7 +69,7 @@ INCREMENT_PERIOD = 0.5
 
 
 class Client:
-    """Byne challenge client."""
+    """Byne challenge client class"""
 
     # Identity of this client
     cid = "client"

@@ -1,6 +1,14 @@
-#
-# Byne challenge communication protocol definitions
-#
+"""
+Byne challenge protocol contants.
+
+This is common code used by server and client.
+
+Source code: https://github.com/coolparadox/BYChallenge
+
+Communication protocol specification:
+https://github.com/coolparadox/BYChallenge/wiki/Protocol-Specification
+
+"""
 
 # Communication protocol commands, see protocol specification at
 # https://github.com/coolparadox/BYChallenge/wiki/Protocol-Specification

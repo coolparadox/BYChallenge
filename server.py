@@ -1,6 +1,36 @@
-#
-# Byne challenge server
-#
+"""
+Byne challenge server module
+
+This module implements the Byne challenge server.
+
+Example:
+
+    $ python2 server.py /tmp/server.log 'tcp://*:5555'
+
+Online help:
+
+    $ python2 server.py --help
+
+    usage: server.py [-h] log_file endpoint
+
+    Byne challenge server
+
+    positional arguments:
+      log_file    path to log file
+      endpoint    0MQ endpoint to bind
+
+    optional arguments:
+      -h, --help  show this help message and exit
+
+This server accepts multiple Byne challenge clients (see client.py).
+All communication with clients is logged to log_file.
+
+Source code: https://github.com/coolparadox/BYChallenge
+
+Communication protocol specification:
+https://github.com/coolparadox/BYChallenge/wiki/Protocol-Specification
+
+"""
 
 import argparse
 import logging
@@ -11,7 +41,7 @@ import zmq
 
 
 class Server:
-    """Byne challenge server."""
+    """Byne challenge server class"""
 
     def __init__(self, log_file):
 
