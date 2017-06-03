@@ -5,10 +5,11 @@
 import argparse
 import logging
 import protocol
-import random
 import Queue
+import random
 import sys
 import threading
+import time
 import zmq
 
 # Constants for access control to socket
@@ -43,9 +44,11 @@ class Client:
     # Are we accessing the backup server?
     backup_mode = False
 
+
     def __init__(self, odd = True, cid = "client"):
         self.cid = cid
         self.odd = odd
+
 
     def work(self):
         """Increment working_value by increment_amount."""
@@ -77,6 +80,7 @@ class Client:
         # Notify
         self.todo.put(TODO_GET_NEW_INCREMENT)
 
+
     def send_and_recv(self, request):
         """Wrapper around send() and recv()."""
 
@@ -93,11 +97,34 @@ class Client:
 
         else:
 
-            # Primary server access timeout; switch to backup server.
+            # Primary server access timeout.
+
+            # Stop timer threads
+            self.restart_timers = False;
+            time.sleep(6)
+
+            # Clean todo queue.
+            self.todo = Queue.Queue()
+
+            # Switch to backup server.
             self.socket = zmq.Context.instance().socket(zmq.REQ)
             self.socket.setsockopt(zmq.IDENTITY, self.cid)
             self.socket.connect(self.backup_endpoint)
+            self.backup_mode = True
+
+            # Start timer threads.
+            self.start_timers()
+
+            # Repeat access to server.
             return self.send_and_recv(request)
+
+
+    def start_timers(self):
+        """Start internal timers."""
+
+        self.restart_timers = True;
+        threading.Timer(INCREMENT_PERIOD, self.work).start()
+        threading.Timer(random.uniform(3.0, 5.0), self.queue_get_increment).start()
 
 
     def start(self, primary_endpoint, backup_endpoint):
@@ -125,11 +152,8 @@ class Client:
         self.working_value = ord(reply[2])
         assert 0 <= self.working_value <= 99, "out of range value from server: %d" % self.working_value
 
-        # Start timer for incrementing value
-        threading.Timer(INCREMENT_PERIOD, self.work).start()
-
-        # Start increment update timer
-        threading.Timer(random.uniform(3.0, 5.0), self.queue_get_increment).start()
+        # Start periodic workers
+        self.start_timers()
 
         # Loop forever
         while True:
