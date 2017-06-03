@@ -87,10 +87,15 @@ class Client:
         self.socket.send(request)
         if self.backup_mode:
 
-            # Client is in backup mode; just hope for the best.
+            # Client is in backup mode; access server and hope for the best.
             return self.socket.recv()
 
-        elif self.socket.poll(3000) > 0:
+        elif self.timeout <= 0:
+
+            # Client is locked in primary mode; access server and hope for the best.
+            return self.socket.recv()
+
+        elif self.socket.poll(self.timeout * 1000) > 0:
 
             # We have something from the primary server. Yay!
             return self.socket.recv()
@@ -98,6 +103,7 @@ class Client:
         else:
 
             # Primary server access timeout.
+            sys.stderr.write('primary server access timeout; switching to backup...')
 
             # Stop timer threads
             self.restart_timers = False;
@@ -127,11 +133,11 @@ class Client:
         threading.Timer(random.uniform(3.0, 5.0), self.queue_get_increment).start()
 
 
-    def start(self, primary_endpoint, backup_endpoint):
+    def start(self, primary_endpoint, backup_endpoint, primary_timeout=0):
         """Connect to a Byne challenge server at a 0MQ endpoint"""
 
-        # Remember backup endpoint just in case of need
         self.backup_endpoint = backup_endpoint
+        self.timeout = primary_timeout
 
         # Connect to server
         self.socket = zmq.Context.instance().socket(zmq.REQ)
@@ -199,13 +205,17 @@ if __name__ == '__main__':
     parser.add_argument('client_type', nargs=1, help='client type', choices=['odd', 'even'])
     parser.add_argument('primary_url', nargs=1, help='0MQ endpoint of primary server')
     parser.add_argument('backup_url', nargs=1, help='0MQ endpoint of backup server')
+    parser.add_argument('timeout', nargs=1, type=int, help='primary server access timeout in seconds (0 = infinite)')
     args = parser.parse_args()
     client_id = args.client_id[0]
     client_type = args.client_type[0]
     primary_url = args.primary_url[0]
     backup_url = args.backup_url[0]
+    client_timeout = args.timeout[0]
+    if client_timeout < 0:
+        client_timeout = 0
 
     # Start client
     sys.stderr.write('starting client "%s" of %s type, connecting to %s with backup %s\n' % (client_id, client_type, primary_url, backup_url))
-    Client(cid=client_id, odd=(client_type=='odd')).start(primary_url, backup_url)
+    Client(cid=client_id, odd=(client_type=='odd')).start(primary_url, backup_url, primary_timeout=client_timeout)
 
